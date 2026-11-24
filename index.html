@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Enviar fatura · Treino Nexi Academy</title>
 <style>
-  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F1F5F4;font-family:system-ui,sans-serif;color:#0B2236}
+  body{margin:0;min-height:100vh;display:flex;flex-direction:column;gap:24px;padding:24px;box-sizing:border-box;align-items:center;justify-content:center;background:#F1F5F4;font-family:system-ui,sans-serif;color:#0B2236}
   .card{background:#fff;border-radius:20px;padding:40px 44px;box-shadow:0 10px 30px rgba(11,34,54,.08);max-width:420px;width:100%}
   h1{font-size:26px;margin:0 0 8px}
   p{color:#41566A;margin:0 0 24px;line-height:1.5}
@@ -13,6 +13,14 @@
   input{width:100%;box-sizing:border-box;padding:12px;border:1px solid rgba(11,34,54,.17);border-radius:12px;margin-bottom:20px}
   button{width:100%;padding:14px;border:0;border-radius:12px;background:#00873F;color:#fff;font-weight:700;font-size:16px;cursor:pointer}
   small{display:block;margin-top:18px;color:#66798A;text-align:center}
+  .card.commits h2{font-size:22px;margin:0 0 16px}
+  .status{margin:0;color:#41566A}
+  .status.erro{color:#B42318}
+  .commit-list{list-style:none;margin:0;padding:0}
+  .commit-item{padding:12px 0;border-top:1px solid rgba(11,34,54,.1)}
+  .commit-item:first-child{border-top:0}
+  .commit-msg{font-weight:600;margin:0 0 4px;overflow-wrap:anywhere}
+  .commit-meta{font-size:13px;color:#66798A;margin:0}
 </style>
 </head>
 <body>
@@ -24,5 +32,84 @@
     <button type="button">Enviar fatura</button>
     <small>Página de treino do Nexi Academy · dados fictícios</small>
   </main>
+
+  <section class="card commits" aria-labelledby="commits-titulo">
+    <h2 id="commits-titulo">Últimos commits</h2>
+    <p id="commits-status" class="status" role="status" aria-live="polite"></p>
+    <ul id="commits-lista" class="commit-list"></ul>
+  </section>
+
+  <script>
+  (function () {
+    var URL_API = 'https://api.github.com/repos/NexiPlay/nexi-academy-treino/commits?per_page=10';
+    var statusEl = document.getElementById('commits-status');
+    var listaEl = document.getElementById('commits-lista');
+
+    function setStatus(texto, erro) {
+      statusEl.textContent = texto;
+      statusEl.hidden = !texto;
+      statusEl.classList.toggle('erro', !!erro);
+    }
+
+    function mensagemErro(err) {
+      var s = err && err.status;
+      if (s === 403 || s === 429) {
+        return 'Limite de requisições da API do GitHub atingido. Tente novamente mais tarde.';
+      }
+      if (s === 404) return 'Repositório não encontrado (ou privado).';
+      if (err instanceof TypeError) return 'Sem conexão com a API do GitHub.';
+      return 'Não foi possível carregar os commits.';
+    }
+
+    function formatarData(iso) {
+      var d = new Date(iso);
+      if (!iso || isNaN(d.getTime())) return 'Data indisponível';
+      return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function criarItem(c) {
+      var info = (c && c.commit) || {};
+      var autor = (info.author && info.author.name) || 'Autor desconhecido';
+      var data = formatarData(info.author && info.author.date);
+      var msg = String(info.message || '').split('\n')[0] || '(sem mensagem)';
+
+      var li = document.createElement('li');
+      li.className = 'commit-item';
+      var pMsg = document.createElement('p');
+      pMsg.className = 'commit-msg';
+      pMsg.textContent = msg;
+      var pMeta = document.createElement('p');
+      pMeta.className = 'commit-meta';
+      pMeta.textContent = autor + ' · ' + data;
+      li.append(pMsg, pMeta);
+      return li;
+    }
+
+    setStatus('Carregando commits…');
+    fetch(URL_API, { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (res) {
+        if (!res.ok) {
+          var e = new Error('HTTP ' + res.status);
+          e.status = res.status;
+          throw e;
+        }
+        return res.json();
+      })
+      .then(function (dados) {
+        if (!Array.isArray(dados)) throw new Error('Resposta inesperada');
+        if (dados.length === 0) {
+          listaEl.replaceChildren();
+          setStatus('Nenhum commit encontrado.');
+          return;
+        }
+        listaEl.replaceChildren.apply(listaEl, dados.map(criarItem));
+        setStatus('');
+      })
+      .catch(function (err) {
+        listaEl.replaceChildren();
+        setStatus(mensagemErro(err), true);
+      });
+  })();
+  </script>
 </body>
 </html>
